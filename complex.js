@@ -9,7 +9,6 @@ var EPSILON = 0.0000001;
 var PI = new Complex(Math.PI,0);
 
 // a complex variable
-
 function Complex(real, imag) {
   this.real = real;
   this.imag = imag;
@@ -30,12 +29,12 @@ function Complex(real, imag) {
 
 // Elementary operations
 
-/*
-* Examples:
-* var w = new Complex(2,5); // 2+5i
-* var z = new Complex(1,1); // 1+2i
-* var w_x_z = w.multiply(z); // (2*1 - 5*2) + (2*2 + 5*1)i
-*/
+/**
+ * Examples:
+ * var w = new Complex(2,5); // 2+5i
+ * var z = new Complex(1,1); // 1+2i
+ * var w_x_z = w.multiply(z); // (2*1 - 5*2) + (2*2 + 5*1)i
+ */
 
 Complex.prototype.multiply = function(z) {
   return new Complex(this.real*z.real - this.imag*z.imag, this.real*z.imag + this.imag*z.real);
@@ -53,8 +52,11 @@ Complex.prototype.power = function(n) {
 Complex.prototype.add = function(z) {
   return new Complex(this.real+z.real, this.imag+z.imag);
 };
-Complex.prototype.add_real = function(r){
+Complex.prototype.add_real = function(r) {
  return new Complex(this.real+ r, this.imag);
+};
+Complex.prototype.sub_real = function(r) {
+  return new Complex(this.real - r, this.imag);
 };
 Complex.prototype.subtract = function(z) {
   return new Complex(this.real-z.real, this.imag-z.imag);
@@ -68,6 +70,7 @@ Complex.prototype.divide = function(z) {
 Complex.prototype.arg = function () {
   return Math.atan2(this.imag, this.real);
 };
+// TODO: this is broken
 Complex.prototype.raise_to = function (c) {
   var theta = this.imag*Math.log(c);
   var coeff = Math.pow(c,this.real);
@@ -76,21 +79,16 @@ Complex.prototype.raise_to = function (c) {
 Complex.prototype.e_to_the = function() {
   return new Complex(Math.exp(this.real)*Math.cos(this.imag),Math.exp(this.real)*Math.sin(this.imag));
 };
-Complex.prototype.distance_sqr = function(z){
+Complex.prototype.distance_sqr = function(z) {
   return (this.real-z.real)*(this.real-z.real)+(this.imag-z.imag)*(this.imag-z.imag);
 };
 Complex.prototype.magnitude = function() {
-  return sqrt(this.real*this.real + this.imag*this.imag);
+  return Math.sqrt(this.mag_sqr());
 };
 Complex.prototype.mag_sqr = function(){
   return this.real*this.real + this.imag*this.imag;
 };
-Complex.prototype.sub_real = function(x) {
-  return new Complex(this.real - x, this.imag);
-};
-Complex.prototype.add_real = function(x) {
-  return new Complex(this.real + x, this.imag);
-};
+// see http://mathworld.wolfram.com/ComplexExponentiation.html
 Complex.prototype.raise_to_z = function(z) {
   var a = this.real;
   var b = this.imag;
@@ -98,8 +96,8 @@ Complex.prototype.raise_to_z = function(z) {
   var d = z.imag;
   var arg = this.arg();
   var asbs = (a*a + b*b);
-  var param = c*arg + (1/2) * d * Math.log(asbs);
-  var to_return = new Complex ( Math.cos(param), Math.sin(param));
+  var param = c * arg + (1/2) * d * Math.log(asbs);
+  var to_return = new Complex(Math.cos(param), Math.sin(param));
   var sc = Math.pow(asbs , c / 2) * Math.pow(Math.E , -d*arg);
   return to_return.scalarMult(sc);
 };
@@ -119,6 +117,34 @@ Complex.prototype.cos_taylor = function() {
   return this.power(2).scalarMult(-1/2).add(this.power(4).scalarMult(1/24)).subtract(this.power(6).scalarMult(1/720)).add(this.power(8).scalarMult(1/40320)).add_real(1);
 };
 
+// Maclaurin series for sin(z) to k+1 terms
+function sin_maclaurin(z , n) {
+  if (n === 0) return z;
+  var m = 2*n + 1;
+  return z.power(m).scalarMult(Math.pow(-1 , n)).scalarMult(1/factorial(m)).add(sin_maclaurin(z , n - 1));
+}
+
+function cos_maclaurin(z, n) {
+  if (n === 0) return z;
+  var m = 2*n;
+  return z.power(m).scalarMult(Math.pow(-1 , n)).scalarMult(1/factorial(m)).add(cos_maclaurin(z , n - 1));
+}
+
+var MACLAURIN_TERMS = 199;
+
+function sin(z) {
+  return sin_maclaurin(z , MACLAURIN_TERMS );
+}
+
+function cos(z) {
+  return cos_maclaurin(z , MACLAURIN_TERMS );
+}
+
+function factorial(n) {
+  if(n === 0) return 1;
+  return n * factorial(n-1);
+}
+
 // Gamma function
 
 // polynomial coeffs
@@ -128,10 +154,11 @@ var P = [ 676.5203681218851,   -1259.1392167224028,
           9.9843695780195716e-6, 1.5056327351493116e-7];
 
 /**
- * Lanczos approximation of Γ(z) implementation based on https://en.wikipedia.org/wiki/Lanczos_approximation
+ * Lanczos approximation of Γ(z) based on https://en.wikipedia.org/wiki/Lanczos_approximation
  * @param Complex z
  */
 function gamma(z) {
+  if (z.magnitude() === 0) return undefined;
   var result;
   var h = 0.5;
   if (z.real < h) {
@@ -140,8 +167,8 @@ function gamma(z) {
                          .multiply( gamma( z.scalarMult(-1).add_real(1) ) ) );
   } else {
     z.real -= 1;
-    var x = new Complex(0.99999999999980993 , 0);
-    var d = new Complex(1,1);
+    var x = new Complex(0.99999999999980993, 0);
+    var d = new Complex(1, 1);
     for(var i = 0; i < P.length; i++) {
       x = x.add( new Complex(P[i] , 0)
             .divide( z.add_real(i+1) ) );
